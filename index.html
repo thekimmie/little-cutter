@@ -3,7 +3,7 @@
 <style>
 :root{color-scheme:light;--ink:#263d3c;--muted:#637674;--mint:#116f68;--bg:#f7f3eb;--paper:#fffefa}*{box-sizing:border-box}body{margin:0;font:15px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:var(--bg)}header{display:flex;justify-content:space-between;align-items:center;padding:14px 19px;border-bottom:1px solid #e2ddd4;background:var(--paper)}h1{font:700 24px Georgia,serif;margin:0}small,.muted{color:var(--muted)}main{display:grid;grid-template-columns:minmax(280px,1fr) 290px;gap:18px;padding:18px;max-width:1180px;margin:auto}.panel{background:var(--paper);padding:15px;border:1px solid #e1ddd4;border-radius:17px;box-shadow:0 3px 15px #122b2210}.toolbar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}button,.filebutton{font:inherit;background:#e6efec;border:1px solid #cbdcd7;border-radius:11px;padding:10px 12px;color:#174c47;cursor:pointer;min-height:43px;display:inline-flex;align-items:center;justify-content:center;gap:5px}button.primary,.filebutton.primary{background:var(--mint);border-color:var(--mint);color:#fff}button:disabled{opacity:.45;cursor:not-allowed}.filebutton input{display:none}.mat-outer{background:#e4e0d8;padding:12px;border-radius:12px;overflow:hidden}#mat{display:block;width:100%;max-height:65vh;aspect-ratio:1/1;background:#fff;touch-action:none;border:1px solid #c9cfc6;border-radius:3px}aside{display:flex;flex-direction:column;gap:15px}h2{font-size:15px;margin:0 0 12px}label.field{display:block;font-size:12px;font-weight:650;margin:9px 0;color:#50625d}input[type=number],select{display:block;width:100%;font:inherit;padding:10px 8px;border:1px solid #cbd3ce;border-radius:9px;background:#fff;margin-top:4px}input[type=range]{width:100%}.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}.note{padding:12px;border-radius:11px;background:#f0f4ef;font-size:13px}#status{min-height:20px;font-size:13px;margin-top:10px}.list{margin:0;padding-left:19px;font-size:13px}.off{background:#eceae6;border-color:#ddd5ca;color:#746e64}.footer{font-size:12px;text-align:center;color:#70817b;padding:4px 15px 20px}@media(max-width:730px){main{grid-template-columns:1fr;padding:10px;gap:10px}aside{display:grid;grid-template-columns:1fr 1fr;gap:10px}aside section:last-child{grid-column:1/-1}#mat{max-height:70vh}}@media(max-width:480px){aside{display:flex}header{padding:12px}}
 </style></head><body>
-<header><div><h1>✂ Little Cutter</h1><small>Design studio · version 3</small></div><span style="font-size:12px;color:#8b6d53">Cameo 3 · Calibration</span></header>
+<header><div><h1>✂ Little Cutter</h1><small>Design studio · version 3.1</small></div><span style="font-size:12px;color:#8b6d53">Cameo 3 · Calibration</span></header>
 <main><section class="panel"><div class="toolbar">
 <label class="filebutton primary">＋ Import SVG<input id="upload" type="file" accept=".svg,image/svg+xml"></label>
 <button id="square">▢ Square</button><button id="circle">◯ Circle</button><button id="duplicate">⧉ Duplicate</button><button id="remove">✕ Delete</button>
@@ -19,7 +19,7 @@
 <label class="field">Axis tested<select id="calAxis"><option value="Carriage (X)">Carriage (X)</option><option value="Mat feed (Y)">Mat feed (Y)</option></select></label>
 <label class="field">Direction<select id="calDirection"><option value="Right">Right</option><option value="Left">Left</option><option value="Forward">Forward</option><option value="Backward">Backward</option></select></label>
 <label class="field">Observed movement (mm, optional)<input id="calDistance" type="number" min="0" max="50" step="0.5" placeholder="Unknown"></label>
-<div class="toolbar"><button id="calRecord">Record observation</button><button id="calDownload">Save log</button><button id="calClear">Clear log</button></div>
+<div class="toolbar"><button id="calRecord">Record observation</button><button id="calCopy">Copy log</button><button id="calDownload">Download log</button><button id="calClear">Clear log</button></div>
 <div id="calReadout" class="note">Reference: mat reloaded; carriage observed near left rest. This is not verified machine home.</div>
 <ol id="calEntries" class="list"></ol>
 <p class="muted" style="font-size:12px">For unexpected motion, use the Cameo's physical controls/power. Bluetooth disconnect is not an emergency stop. No homing, cut, or motion command is sent from this panel.</p></section></aside></main>
@@ -79,19 +79,29 @@ $ble('bleDisconnect').onclick=()=>{if(device?.gatt?.connected)device.gatt.discon
 </script><script>
 (()=>{'use strict';
 const $=id=>document.getElementById(id);
-const entries=[];
+const KEY='little-cutter-calibration-v31';
+let entries=[];
+try{const saved=JSON.parse(localStorage.getItem(KEY)||'[]');if(Array.isArray(saved))entries=saved.filter(x=>typeof x==='string').slice(0,500)}catch(e){}
+function persist(){try{localStorage.setItem(KEY,JSON.stringify(entries));$('calReadout').textContent='Observations saved locally in this browser. Machine position remains unknown.'}catch(e){$('calReadout').textContent='Local storage unavailable. Use Copy log to preserve your observations.'}}
+function logText(){return ['Little Cutter v3.1 — manual calibration observations','Machine origin unverified; blade removed; no cutting commands sent.','',...entries].join('\n')}
 function render(){const list=$('calEntries');list.replaceChildren();for(const e of entries){const li=document.createElement('li');li.textContent=e;list.append(li)}}
 $('calRecord').onclick=()=>{
  const axis=$('calAxis').value,dir=$('calDirection').value,raw=$('calDistance').value.trim();
  const distance=raw===''?'distance not measured':`${Number(raw)} mm reported`;
  if(raw!==''&&(!Number.isFinite(Number(raw))||Number(raw)<0||Number(raw)>50)){alert('Enter a distance between 0 and 50 mm or leave it blank.');return}
  const entry=`${new Date().toLocaleString()} — ${axis}, ${dir}, ${distance} (manual observation; not machine coordinates)`;
- entries.push(entry);render();$('calReadout').textContent='Observation recorded. Position remains unknown; cutting disabled.';
+ entries.push(entry);render();persist();
 };
 $('calDownload').onclick=()=>{
  const text=['Little Cutter v3 — manual calibration observations','Machine origin unverified; blade removed; no cutting commands sent.','',...entries].join('\\n');
  const blob=new Blob([text],{type:'text/plain'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='little-cutter-calibration.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 };
-$('calClear').onclick=()=>{if(confirm('Clear the calibration notebook?')){entries.length=0;render()}};
+$('calCopy').onclick=async()=>{
+const value=logText();
+try{await navigator.clipboard.writeText(value);$('calReadout').textContent='Log copied! Paste into Notes to keep a backup.'}
+catch(e){const t=document.createElement('textarea');t.value=value;t.style.cssText='width:100%;height:130px';$('calReadout').replaceChildren(t);t.focus();t.select();try{document.execCommand('copy');$('calReadout').textContent='Log selected/copied if supported. Paste into Notes.'}catch(x){$('calReadout').textContent='Copy unavailable. Your observations remain visible below.'}}
+};
+$('calClear').onclick=()=>{if(confirm('Clear the calibration notebook?')){entries.length=0;render();persist()}};
+render();
 })();
 </script></body></html>
