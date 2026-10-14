@@ -1,0 +1,14 @@
+name: Validate Little Cutter
+on:
+  push:
+    branches: [main, 'feat/**']
+  pull_request:
+jobs:
+  no-hardware-checks:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate inline JavaScript and guarded calibration behavior
+        run: node tests/validate.js
