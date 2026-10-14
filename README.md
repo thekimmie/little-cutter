@@ -2,7 +2,7 @@
 
 A standalone, browser-based design studio and **experimental Silhouette Cameo 3 Bluetooth calibration console**. Cutting is disabled; offline design previews are not machine instructions.
 
-## Current development release: v18.0
+## Current development release: v19.0
 
 - The app displays its release from one `APP_VERSION` constant instead of the old, fixed “version 5.0” label.
 - The blade-free calibration console has four directional controls, nominal 1 / 2 / 5 mm steps, and up to eight guarded moves per connection.
@@ -33,3 +33,16 @@ Other console arrows are for later supervised testing, not part of the first tes
 The source of this standalone app is `index.html`. To bump the release, update `APP_VERSION` once in that file; all in-app version labels update automatically. Run `node tests/validate.js` locally for syntax and static safety checks.
 
 > **Status:** This version is software-only until a person tests it with blade removed. Do not treat passing code checks as evidence of machine safety or position calibration.
+
+## v19 guided square-pattern test
+
+Begin from a fresh reported `80,40,10` position with the blade fully removed and a clear loaded mat. Open the guided square panel and tap **Start four-step square**. Each move is separately confirmed with a physical warning, a five-second cancelable countdown, and mandatory READY + G before the next control enables. No automatic movement or cutting.
+
+| Step | Button | Target G fields | Expected nominal travel |
+| --- | --- | --- | --- |
+| 1 | Mat back | `100,40,10` | ~1 mm back |
+| 2 | Carriage right | `100,60,10` | ~1 mm right |
+| 3 | Mat forward | `80,60,10` | ~1 mm forward |
+| 4 | Carriage left | `80,40,10` | ~1 mm left |
+
+For each step, visually verify direction and approximate travel. Stop if motion looks abnormal; use the physical power switch if needed. The app may report completion only after four matching coordinate readbacks, but this **does not prove the geometric path was accurate**. Copy the full BLE trace and note actual physical observations before progressing to cutting or larger movements. The square test requires four unused movement attempts remaining on the current connection; reconnect to reset the connection-specific budget if necessary, after inspecting the machine.
