@@ -61,7 +61,7 @@ for(const needed of [
 for(const id of ['squareStart','squareStop','squareProgress','squareVersion']){
   assert.match(html,new RegExp('id="'+id+'"'),'Missing square UI '+id);
 }
-assert.match(html,/const APP_VERSION='20\\.0'/);
+assert.match(html,/const APP_VERSION='20\.0'/);
 for(const size of [1,2]){
   const square=[{x:80+size*20,y:40},{x:80+size*20,y:40+size*20},{x:80,y:40+size*20},{x:80,y:40}];
   assert.deepEqual(square[3],{x:80,y:40});
