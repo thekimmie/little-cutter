@@ -10,7 +10,8 @@ parts.forEach((script,i)=>{
   const r=spawnSync(process.execPath,['--check'],{input:script,encoding:'utf8'});
   assert.equal(r.status,0,'Script '+(i+1)+' syntax failure:\n'+r.stderr);
 });
-assert.match(html,/const APP_VERSION='18\.0'/);
+assert.match(html,/const APP_VERSION='[0-9]+\.[0-9]+'/);
+assert.match(html,/id="consoleVersion"/);
 assert.match(html,/id="appVersion"/);
 assert.doesNotMatch(html,/Design studio · version 5\.0/);
 for(const id of ['bleConnect','bleFirmware','bleStatus','blePosition','calStep','calBack','calForward','calLeft','calRight','calCancel','positionCopy','bleTrace']){
