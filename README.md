@@ -2,7 +2,7 @@
 
 A standalone, browser-based design studio and **experimental Silhouette Cameo 3 Bluetooth calibration console**. Cutting is disabled; offline design previews are not machine instructions.
 
-## Current development release: v19.0
+## Current development release: v20.0
 
 - The app displays its release from one `APP_VERSION` constant instead of the old, fixed “version 5.0” label.
 - The blade-free calibration console has four directional controls, nominal 1 / 2 / 5 mm steps, and up to eight guarded moves per connection.
@@ -46,3 +46,11 @@ Begin from a fresh reported `80,40,10` position with the blade fully removed and
 | 4 | Carriage left | `80,40,10` | ~1 mm left |
 
 For each step, visually verify direction and approximate travel. Stop if motion looks abnormal; use the physical power switch if needed. The app may report completion only after four matching coordinate readbacks, but this **does not prove the geometric path was accurate**. Copy the full BLE trace and note actual physical observations before progressing to cutting or larger movements. The square test requires four unused movement attempts remaining on the current connection; reconnect to reset the connection-specific budget if necessary, after inspecting the machine.
+
+## v20: clearer guided tests and the next experiment
+
+The guided calibration panel now shows **Next action** explicitly. A finished square has a working **Finish test** button; finishing or aborting locks further motion on the current connection. After each command, wait for physical motion to stop, **Check READY**, then **Query G**. You do not need to query firmware every time; confirm it once after connecting. Only the relevant arrow is enabled during the guided test. If a button is disabled, follow the Next action message instead of retrying.
+
+**Next test: 2 mm square**, blade fully removed and mat loaded. Start with fresh readback `80,40,10` and at least 4 unused move slots. Select **2 mm square**. The four targets are `120,40,10` (mat back), `120,80,10` (carriage right), `80,80,10` (mat forward), `80,40,10` (carriage left). These are four separately confirmed motions with five-second cancelable countdowns and no cutting. After every move, observe the physical direction/distance, then check READY and query G. When the complete message appears, tap Finish test, copy BLE trace, and disconnect. An unexpected response or motion means stop and inspect; machine power is the emergency stop, not Bluetooth.
+
+The old 1 mm repeatability square remains available from the size selector. Both suites can be run in separate sessions; the test size is locked while a square is active. A complete matching-coordinate loop is **not** proof of exact physical square geometry.
