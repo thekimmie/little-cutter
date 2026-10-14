@@ -18,7 +18,7 @@
 <p class="note"><strong>Experimental physical movement, blade removed.</strong> This console sends only guarded position requests inside the previously tested command range. It never cuts, homes, or moves automatically. Field 1 is mat feed (larger = back); field 2 is carriage (larger = right). Approximately 20 command units per mm was observed for the carriage only. Mat scale, machine origin, and field 3 remain unverified.</p>
 <div class="toolbar"><button id="bleConnect" class="primary">Connect Cameo</button><button id="bleFirmware" disabled>Read firmware (FG)</button><button id="bleStatus" disabled>Check READY</button><button id="blePosition" disabled>Query position (G)</button><button id="bleCopyTrace">Copy BLE trace</button><button id="bleDisconnect" disabled>Disconnect</button></div>
 <div id="positionPanel" class="note" aria-live="polite"><strong>Reported position</strong><div id="positionSummary" style="font-size:20px;font-weight:700;margin:8px 0">Not queried this connection</div><div id="positionDetails" style="font-size:12px;white-space:pre-wrap">Read firmware, check READY, then query G. Reported units are not verified millimeters.</div><button id="positionCopy" type="button">Copy position report</button></div>
-<div class="note" style="margin-top:10px"><strong>Directional calibration console · v18</strong>
+<div class="note" style="margin-top:10px"><strong>Directional calibration console · v<span id="consoleVersion">loading…</span></strong>
 <label class="field">Nominal step (carriage scale only)<select id="calStep"><option value="1">1 mm (~20 units)</option><option value="2">2 mm (~40 units)</option><option value="5" selected>5 mm (~100 units)</option></select></label>
 <div class="toolbar" style="justify-content:center"><button id="calBack" disabled>↑ Mat back</button><button id="calForward" disabled>↓ Mat forward</button><button id="calLeft" disabled>← Carriage left</button><button id="calRight" disabled>→ Carriage right</button></div>
 <p id="calSafety" class="muted" style="font-size:12px">Locked until firmware V1.60, READY and a fresh G readback. Maximum eight guarded moves per connection, one at a time. Commands bounded to field 1: 80–180 and field 2: 40–140; these numbers are not physical safety guarantees. Check READY and G again after every move.</p></div>
@@ -41,6 +41,7 @@
 const APP_VERSION='18.0';
 document.title=`Little Cutter v${APP_VERSION} · iPad Studio`;
 document.getElementById('appVersion').textContent=APP_VERSION;
+document.getElementById('consoleVersion').textContent=APP_VERSION;
 const ns='http://www.w3.org/2000/svg', allowed=new Set(['svg','g','path','rect','circle','ellipse','line','polyline','polygon']), attrs=new Set(['d','x','y','x1','y1','x2','y2','cx','cy','r','rx','ry','width','height','points','transform','viewBox','preserveAspectRatio','fill-rule','clip-rule']);
 const $=id=>document.getElementById(id), mat=$('mat'),layer=$('objects'),selLayer=$('selection');let items=[],selected=null,start=null,extent=300,id=0;
 const msg=s=>{$('status').textContent=s};const num=n=>Math.round(n*100)/100;
