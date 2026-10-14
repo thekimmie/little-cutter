@@ -18,6 +18,10 @@
 <p class="note"><strong>Experimental physical movement, blade removed.</strong> This console sends only guarded position requests inside the previously tested command range. It never cuts, homes, or moves automatically. Field 1 is mat feed (larger = back); field 2 is carriage (larger = right). Approximately 20 command units per mm was observed for the carriage only. Mat scale, machine origin, and field 3 remain unverified.</p>
 <div class="toolbar"><button id="bleConnect" class="primary">Connect Cameo</button><button id="bleFirmware" disabled>Read firmware (FG)</button><button id="bleStatus" disabled>Check READY</button><button id="blePosition" disabled>Query position (G)</button><button id="bleCopyTrace">Copy BLE trace</button><button id="bleDisconnect" disabled>Disconnect</button></div>
 <div id="positionPanel" class="note" aria-live="polite"><strong>Reported position</strong><div id="positionSummary" style="font-size:20px;font-weight:700;margin:8px 0">Not queried this connection</div><div id="positionDetails" style="font-size:12px;white-space:pre-wrap">Read firmware, check READY, then query G. Reported units are not verified millimeters.</div><button id="positionCopy" type="button">Copy position report</button></div>
+<div class="note" style="margin-top:10px"><strong>Guided square calibration · v<span id="squareVersion">loading…</span></strong>
+<p>Four independent, blade-free 1 mm nominal moves: mat back → carriage right → mat forward → carriage left. Start only from reported <code>80,40,10</code>. After <strong>every</strong> move, observe hardware, check READY and read G. The app never sends the next movement automatically.</p>
+<div class="toolbar"><button id="squareStart" disabled>Start four-step square</button><button id="squareStop" disabled>End square test</button></div>
+<div id="squareProgress" role="status" class="note">Connect, verify firmware V1.60, check READY and query G. Square begins from 80,40,10.</div></div>
 <div class="note" style="margin-top:10px"><strong>Directional calibration console · v<span id="consoleVersion">loading…</span></strong>
 <label class="field">Nominal step (carriage scale only)<select id="calStep"><option value="1">1 mm (~20 units)</option><option value="2">2 mm (~40 units)</option><option value="5" selected>5 mm (~100 units)</option></select></label>
 <div class="toolbar" style="justify-content:center"><button id="calBack" disabled>↑ Mat back</button><button id="calForward" disabled>↓ Mat forward</button><button id="calLeft" disabled>← Carriage left</button><button id="calRight" disabled>→ Carriage right</button></div>
@@ -38,10 +42,11 @@
 <script>
 'use strict';
 // Bump one constant for every release; app labels and exported diagnostics use it.
-const APP_VERSION='18.0';
+const APP_VERSION='19.0';
 document.title=`Little Cutter v${APP_VERSION} · iPad Studio`;
 document.getElementById('appVersion').textContent=APP_VERSION;
 document.getElementById('consoleVersion').textContent=APP_VERSION;
+document.getElementById('squareVersion').textContent=APP_VERSION;
 const ns='http://www.w3.org/2000/svg', allowed=new Set(['svg','g','path','rect','circle','ellipse','line','polyline','polygon']), attrs=new Set(['d','x','y','x1','y1','x2','y2','cx','cy','r','rx','ry','width','height','points','transform','viewBox','preserveAspectRatio','fill-rule','clip-rule']);
 const $=id=>document.getElementById(id), mat=$('mat'),layer=$('objects'),selLayer=$('selection');let items=[],selected=null,start=null,extent=300,id=0;
 const msg=s=>{$('status').textContent=s};const num=n=>Math.round(n*100)/100;
@@ -75,6 +80,8 @@ const dirs={back:{dx:1,dy:0,title:'mat toward back'},forward:{dx:-1,dy:0,title:'
 const BOUNDS={minX:80,maxX:180,minY:40,maxY:140},MAX_MOVES=8;
 let device=null,chars=null,busy=false,readyOK=false,firmwareOK=false,pendingFirmware=false,pendingPosition=false;
 let lastPosition=null,expected=null,moveCount=0,locked=false,countdownActive=false,countdownToken=0;
+const SQUARE=[{axis:'back',x:100,y:40},{axis:'right',x:100,y:60},{axis:'forward',x:80,y:60},{axis:'left',x:80,y:40}];
+let squareIndex=-1,squarePending=false,squareComplete=false;
 const trace=[];
 const ascii=a=>Array.from(a).map(x=>x>=32&&x<=126?String.fromCharCode(x):'.').join('');
 const hex=a=>Array.from(a).map(x=>x.toString(16).padStart(2,'0')).join(' ');
@@ -82,13 +89,28 @@ const say=t=>{el('bleMessage').textContent=t;};
 function log(s){trace.push(new Date().toLocaleTimeString()+' '+s);if(trace.length>160)trace.shift();el('bleTrace').textContent=trace.join('\n');}
 function targetFor(name){
   if(!chars||busy||countdownActive||!readyOK||!firmwareOK||!lastPosition||expected||locked||moveCount>=MAX_MOVES||lastPosition.third!==10)return null;
-  const mm=Number(el('calStep').value);
+  const mm=squareIndex>=0?1:Number(el('calStep').value);
   if(![1,2,5].includes(mm))return null;
   const d=dirs[name],units=mm*20,x=lastPosition.x+units*d.dx,y=lastPosition.y+units*d.dy;
+  if(squareIndex>=0){
+    const next=SQUARE[squareIndex];
+    if(!next||squarePending||name!==next.axis||x!==next.x||y!==next.y)return null;
+  }
   if(!Number.isInteger(x)||!Number.isInteger(y)||x<BOUNDS.minX||x>BOUNDS.maxX||y<BOUNDS.minY||y>BOUNDS.maxY)return null;
   return {x,y,mm,axis:name,fromX:lastPosition.x,fromY:lastPosition.y};
 }
 function refresh(){
+  const canBegin=!!chars&&!busy&&!countdownActive&&readyOK&&firmwareOK&&!locked&&!expected&&
+    !!lastPosition&&lastPosition.x===80&&lastPosition.y===40&&lastPosition.third===10&&moveCount<=MAX_MOVES-4;
+  el('squareStart').disabled=squareIndex>=0||squareComplete||!canBegin;
+  el('squareStop').disabled=squareIndex<0;
+  if(squareIndex>=0){
+    const current=SQUARE[squareIndex];
+    el('squareProgress').textContent=squarePending?
+      'Step '+(squareIndex+1)+'/4: motion requested; physically observe, Check READY, Query G. Do not send another move yet.':
+      'Step '+(squareIndex+1)+'/4: press '+current.axis.toUpperCase()+' (nominal 1 mm) toward '+current.x+','+current.y+'. The app requires confirmation and countdown.';
+  }else if(squareComplete)el('squareProgress').textContent='Square complete: four target readbacks matched. Confirm physically returned to start and copy BLE trace.';
+  else el('squareProgress').textContent='Square inactive. Start requires fresh READY + G = 80,40,10. Manual direction tests remain available.';
   for(const name of Object.keys(dirs))el('cal'+name[0].toUpperCase()+name.slice(1)).disabled=!targetFor(name);
   el('bleConnect').disabled=!!chars||busy;
   el('bleDisconnect').disabled=!chars;
@@ -102,7 +124,7 @@ function refresh(){
 function reset(message){
   countdownToken++;countdownActive=false;busy=false;chars=null;device=null;
   pendingFirmware=false;pendingPosition=false;firmwareOK=false;readyOK=false;
-  lastPosition=null;expected=null;moveCount=0;locked=false;
+  lastPosition=null;expected=null;moveCount=0;locked=false;squareIndex=-1;squarePending=false;squareComplete=false;
   el('calCountdown').style.display='none';el('calCancel').style.display='none';el('calCancel').disabled=true;
   el('positionSummary').textContent='Not queried this connection';
   el('positionDetails').textContent='No verified current position. Connect, read firmware, check READY, and query G.';
@@ -140,10 +162,15 @@ el('bleConnect').onclick=async()=>{
           log('PARSED G => FIELD1='+x+' FIELD2='+y+' FIELD3='+third);
           if(expected){
             if(x!==expected.x||y!==expected.y||third!==10){
-              locked=true;log('POSITION MISMATCH — further motion locked');
+              locked=true;squareIndex=-1;squarePending=false;log('POSITION MISMATCH — further motion locked');
               say('POSITION MISMATCH after motion; expected '+expected.x+','+expected.y+',10. DO NOT SEND MORE MOVES.');
             }else{
               log('EXPECTED POSITION CONFIRMED: '+x+','+y+',10');
+              if(squareIndex>=0&&squarePending){
+                const stage=SQUARE[squareIndex];
+                if(stage.x!==x||stage.y!==y){locked=true;squareIndex=-1;log('SQUARE STAGE MISMATCH — locked');}
+                else {squarePending=false;squareIndex++;if(squareIndex===SQUARE.length){squareIndex=-1;squareComplete=true;log('SQUARE COMPLETE — all four readbacks matched');}}
+              }
               say('Position verified at '+x+','+y+',10. A new move needs READY (again) and a fresh G check.');
             }
             expected=null;readyOK=false;
@@ -196,6 +223,21 @@ el('blePosition').onclick=async()=>{
   catch(err){pendingPosition=false;locked=true;log('G ERROR '+err.message);say('G query failed; no motion allowed: '+err.message);}
   finally{busy=false;refresh();}
 };
+el('squareStart').onclick=()=>{
+  if(el('squareStart').disabled)return;
+  squareIndex=0;squarePending=false;squareComplete=false;
+  el('calStep').value='1';
+  log('GUIDED SQUARE START — four separate 20-unit moves; no automatic physical motion');
+  say('Square test armed; press Mat back for first movement. Each step requires physical observation and a fresh READY/G check.');
+  refresh();
+};
+el('squareStop').onclick=()=>{
+  if(squareIndex<0)return;
+  if(countdownActive){el('calCancel').click();}
+  squareIndex=-1;squarePending=false;locked=true;
+  log('GUIDED SQUARE ABORTED — movement locked for this connection');
+  say('Square test ended; movement locked for this connection. Disconnect and inspect before restarting.');refresh();
+};
 el('calStep').onchange=refresh;
 el('calCancel').onclick=()=>{
   if(!countdownActive)return;
@@ -222,7 +264,7 @@ async function propose(name){
   }
   if(token!==countdownToken||!countdownActive||!chars||!device||!device.gatt.connected)return;
   // Latch the attempt BEFORE the write. An uncertain write must never be retried automatically.
-  countdownActive=false;moveCount++;expected={x:t.x,y:t.y};lastPosition=null;readyOK=false;
+  countdownActive=false;moveCount++;expected={x:t.x,y:t.y};if(squareIndex>=0)squarePending=true;lastPosition=null;readyOK=false;
   el('calCancel').disabled=true;el('calCancel').style.display='none';
   el('calCountdown').textContent='SENDING ONCE — WATCH MACHINE';
   const bytes=new TextEncoder().encode('M'+t.x+','+t.y+'\x03');
@@ -232,7 +274,7 @@ async function propose(name){
     el('calCountdown').textContent='SENT — OBSERVE & CHECK POSITION';
     say('One movement request sent. Observe actual direction/distance. When stopped, Check READY, then Query G and copy the trace. Do not repeat without readback.');
   }catch(err){
-    locked=true;log('MOTION WRITE UNCERTAIN '+err.message);
+    locked=true;squareIndex=-1;squarePending=false;log('MOTION WRITE UNCERTAIN '+err.message);
     el('calCountdown').textContent='WRITE UNCERTAIN — STOP';
     say('Movement may or may not have occurred. Do NOT retry this connection. Inspect machine and trace.');
   }finally{busy=false;refresh();}
@@ -241,7 +283,7 @@ for(const name of Object.keys(dirs))el('cal'+name[0].toUpperCase()+name.slice(1)
 el('bleCopyTrace').onclick=async()=>{
   const report=['Little Cutter v'+APP_VERSION+' — BLE diagnostic trace',
   'Physical motion guarded. Field 1: mat feed; field 2: carriage. Blade removed. Mat scale/origin not verified.',
-  'Movement attempts this connection: '+moveCount+'/'+MAX_MOVES,'',...trace].join('\n');
+  'Movement attempts this connection: '+moveCount+'/'+MAX_MOVES,'Square progress: '+(squareComplete?'complete':squareIndex<0?'inactive':(squareIndex+1)+'/4'+(squarePending?' awaiting confirmation':'')),'',...trace].join('\n');
   try{await navigator.clipboard.writeText(report);say('BLE trace copied.');}
   catch(err){say('Clipboard unavailable. Select the trace text manually.');}
 };

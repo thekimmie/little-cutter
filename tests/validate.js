@@ -32,4 +32,37 @@ assert.doesNotMatch(html,/id="bleProbe"/);
 const field={x:80,y:40};
 const requestedRight5={x:field.x,y:field.y+5*20};
 assert.deepEqual(requestedRight5,{x:80,y:140},'First planned test must request M80,140');
-console.log('Little Cutter: '+parts.length+' inline scripts passed syntax checks, and v18 calibration guards are present.');
+// Regression suite: square path, guard conditions and command geometry (no hardware).
+const SQUARE=[{axis:'back',x:100,y:40},{axis:'right',x:100,y:60},{axis:'forward',x:80,y:60},{axis:'left',x:80,y:40}];
+const direction={back:[1,0],right:[0,1],forward:[-1,0],left:[0,-1]};
+let pos={x:80,y:40},steps=0;
+for(const st of SQUARE){
+  const [dx,dy]=direction[st.axis];
+  pos={x:pos.x+20*dx,y:pos.y+20*dy};
+  assert.deepEqual(pos,{x:st.x,y:st.y},'Square stage '+st.axis);
+  assert.ok(pos.x>=80&&pos.x<=180&&pos.y>=40&&pos.y<=140,'Square bounds');
+  steps++;
+}
+assert.equal(steps,4);
+assert.deepEqual(pos,{x:80,y:40},'Square must close at starting coordinate');
+const bleScript=parts.find(p=>p.includes('const SQUARE='));
+assert.ok(bleScript,'Guided square BLE script missing');
+for(const needed of [
+  "squareIndex=-1","squarePending=false","squareComplete=false",
+  "squarePending=true","SQUARE[squareIndex]","squareIndex++",
+  "squareComplete=true","lastPosition.third!==10",
+  "name!==next.axis","x!==next.x||y!==next.y",
+  "if(squareIndex>=0)squarePending=true",
+  "locked=true;squareIndex=-1;squarePending=false",
+  "readyOK=false","expected={x:t.x,y:t.y}"
+]){
+  assert.ok(bleScript.includes(needed),'Missing square interlock '+needed);
+}
+for(const id of ['squareStart','squareStop','squareProgress','squareVersion']){
+  assert.match(html,new RegExp('id="'+id+'"'),'Missing square UI '+id);
+}
+assert.match(html,/const APP_VERSION='19\.0'/);
+assert.match(html,/squareIndex>=0\?1:Number\(el\('calStep'\).value\)/);
+assert.match(html,/moveCount<=MAX_MOVES-4/);
+assert.match(html,/if\(countdownActive\)\{el\('calCancel'\).click\(\);\}/);
+console.log('Little Cutter v19: '+parts.length+' scripts syntax-checked, '+steps+' square legs simulated, position bounds and safety interlocks verified.');
