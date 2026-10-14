@@ -30,6 +30,6 @@ Other console arrows are for later supervised testing, not part of the first tes
 
 ## Development
 
-The source of this standalone app is `index.html`. To bump the release, update `APP_VERSION` once in that file and update the corresponding release test. Run `node tests/validate.js` locally for syntax and static safety checks.
+The source of this standalone app is `index.html`. To bump the release, update `APP_VERSION` once in that file; all in-app version labels update automatically. Run `node tests/validate.js` locally for syntax and static safety checks.
 
 > **Status:** This version is software-only until a person tests it with blade removed. Do not treat passing code checks as evidence of machine safety or position calibration.
