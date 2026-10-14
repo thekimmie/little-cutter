@@ -45,7 +45,7 @@ for(const st of SQUARE){
 }
 assert.equal(steps,4);
 assert.deepEqual(pos,{x:80,y:40},'Square must close at starting coordinate');
-const bleScript=parts.find(p=>p.includes('const SQUARE='));
+const bleScript=parts.find(p=>p.includes('const makeSquare='));
 assert.ok(bleScript,'Guided square BLE script missing');
 for(const needed of [
   "squareIndex=-1","squarePending=false","squareComplete=false",
@@ -61,8 +61,18 @@ for(const needed of [
 for(const id of ['squareStart','squareStop','squareProgress','squareVersion']){
   assert.match(html,new RegExp('id="'+id+'"'),'Missing square UI '+id);
 }
-assert.match(html,/const APP_VERSION='19\.0'/);
-assert.match(html,/squareIndex>=0\?1:Number\(el\('calStep'\).value\)/);
+assert.match(html,/const APP_VERSION='20\.0'/);
+for(const size of [1,2]){
+  const square=[{x:80+size*20,y:40},{x:80+size*20,y:40+size*20},{x:80,y:40+size*20},{x:80,y:40}];
+  assert.deepEqual(square[3],{x:80,y:40});
+  for(const p of square)assert.ok(p.x>=80&&p.x<=180&&p.y>=40&&p.y<=140);
+}
+assert.match(html,/id="squareNext"/);
+assert.match(html,/id="squareSize"/);
+assert.match(html,/squareFinished=true;locked=true/);
+assert.match(html,/squareComplete\|\|squareFinished/);
+assert.match(html,/readyFresh=readyOK/);
+assert.match(html,/squareIndex>=0\?Number\(el\('squareSize'\).value\):Number\(el\('calStep'\).value\)/);
 assert.match(html,/moveCount<=MAX_MOVES-4/);
-assert.match(html,/if\(countdownActive\)\{el\('calCancel'\).click\(\);\}/);
-console.log('Little Cutter v19: '+parts.length+' scripts syntax-checked, '+steps+' square legs simulated, position bounds and safety interlocks verified.');
+assert.match(html,/if\(countdownActive\)el\('calCancel'\).click\(\);/);
+console.log('Little Cutter v20: '+parts.length+' scripts syntax-checked, '+steps+' square legs simulated, position bounds and safety interlocks verified.');
